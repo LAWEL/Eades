@@ -147,14 +147,15 @@ void eades(Graph& graph) {
     sum_kinetic_energy = 0.0;
     for(auto node1 : graph.nodes) {
       Force force;
-      for(Edge edge : graph.adjacency_list[node1.id_]) {
-        auto node2 = graph.nodes.find(Node(edge.to_));
+      for(auto node2 : graph.nodes) {
 /*
   力 := 力 + 定数 / 距離（ノード1, ノード2) ^ 2  // クーロン力
   force += getCoulombsForce(node1, node2);
 */
-
-        force += COULOMB / pow(abs(node1.v - node2->v), 2.0);
+        force += COULOMB / pow(abs(node1.v - node2.v), 2.0);
+      }
+      for(Edge edge : graph.adjacency_list[node1.id_]) {
+        auto node2 = graph.nodes.find(Node(edge.to_));
 /*
   力 := 力 + バネ定数 * (距離 (ノード1, ノード2) - バネの自然長)  // フックの法則による力
   force += getHookeForce(node1, node2);
