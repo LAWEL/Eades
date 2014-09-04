@@ -25,14 +25,14 @@ void log(const char *level, const char *file, const int line, const char *format
 
 namespace eades {
 
-  const double MAX_COORDINATE = 1e3;
-  const double MAX_NUM_NODE = 1e3;
+  const double MAX_COORDINATE = 1.0 * 1e3;
   const double COULOMB = 5.0 * 1e2;
   const double SPRING = 1e-1;
-  const double NATURAL_LENGTH = 1.0 * 1e1;
-  const double EPS = 1e-4;
-  const double CODF = 3.0 * 1e-1;
-  const double THRESHOLD = 1e-1;
+  const double NATURAL_LENGTH = 3.0 * 1e2;
+  const double CODF = 1.0 * 1e-1;
+  const double THRESHOLD = 1e-2;
+  const double TIME = 1e-1;
+  const double EPS = 1e-6;
 
   typedef std::complex<double> Velocity;
   typedef Velocity Force;
@@ -59,6 +59,37 @@ namespace eades {
       return id_ == node.id_;
     }
 
+    Force getSpringForce(Node& node) {
+      double dx = x - node.x;
+      double dy = y - node.y;
+      double norm = dx * dx + dy * dy;
+
+      if(norm < EPS) {
+        exit(1);
+      } else {
+        double dist = sqrt(norm);
+        double cos = dx / dist;
+        double sin = dy / dist;
+        return Force(-SPRING * (dist - NATURAL_LENGTH) * cos,
+                     -SPRING * (dist - NATURAL_LENGTH) * sin);
+      }
+    }
+
+    Force getCoulombsForce(Node& node) {
+      double dx = x - node.x;
+      double dy = y - node.y;
+      double norm = dx * dx + dy * dy;
+
+      if(norm < EPS) {
+        exit(1);
+      } else {
+        double dist = sqrt(norm);
+        double cos = dx / dist;
+        double sin = dy / dist;
+        return Force(COULOMB / norm * cos, COULOMB / norm * sin);
+      }
+    }
+
   };
 
   class Edge {
@@ -75,44 +106,31 @@ namespace eades {
 
   class Graph{
   public:
-    static const int EXPECTED_NUM_NODE = 1000;
-    std::set<Node> nodes;
+    const unsigned int size;
+    std::vector<Node> nodes;
     std::vector<std::vector<Edge> > adjacency_list;
 
-    Graph() {
-      adjacency_list.reserve(EXPECTED_NUM_NODE);
-    }
-
-    bool addNode(const Node& node){
-      if(nodes.find(node) != nodes.end()) {
-        return false;
+    Graph(unsigned int graph_size) : size(graph_size) {
+      nodes.reserve(graph_size);
+      adjacency_list.reserve(graph_size);
+      for(size_t i = 0; i < size; ++i) {
+        adjacency_list[i].reserve(size);
       }
-      nodes.insert(node);
-      if(node.id_ >= adjacency_list.size()) {
-        adjacency_list.resize(node.id_ + 1);
-      }
-      return true;
-    }
-
-    bool addEdge(const Edge& edge) {
-      if(adjacency_list.size() <= edge.from_) {
-        return false;
-      }
-      adjacency_list[edge.from_].push_back(edge);
-      return true;
-    }
-
-    void init(const unsigned int num_node) {
       std::random_device seed_gen;
       std::mt19937 engine(seed_gen());
       std::uniform_real_distribution<double> pos(-MAX_COORDINATE, MAX_COORDINATE);
-      for(unsigned int i = 0; i < num_node; ++i) {
+      for(unsigned int i = 0; i < graph_size; ++i) {
         Node node(i);
         node.x = pos(engine);
         node.y = pos(engine);
         node.label = "p" + std::to_string(i);
-        addNode(node);
+        nodes.push_back(std::move(node));
       }
+
+    }
+
+    void addEdge(const Edge& edge) {
+      adjacency_list[edge.from_].push_back(edge);
     }
 
     void write(const std::string& file_name){
@@ -126,8 +144,8 @@ namespace eades {
       }
       for(auto node1 : nodes) {
         for(Edge edge : adjacency_list[node1.id_]) {
-          auto node2 = nodes.find(Node(edge.to_));
-          *ofs << "  " << node1.label << " -> " << node2->label << "[arrowsize = " << 2 << "];" << std::endl;
+          auto node2 = nodes[edge.to_];
+          *ofs << "  " << node1.label << " -> " << node2.label << "[arrowsize = " << 2 << "];" << std::endl;
         }
       }
       *ofs << "}" << std::endl;
@@ -140,45 +158,53 @@ namespace eades {
 
   };
 
-
 void eades(Graph& graph) {
   double sum_kinetic_energy;
+  unsigned long long cnt = 0;
   do {
+    ++cnt;
     sum_kinetic_energy = 0.0;
-    for(auto node1 : graph.nodes) {
+    for(unsigned int i = 0; i < graph.size; ++i) {
+      Node& node1 = graph.nodes[i];
       Force force;
-      for(auto node2 : graph.nodes) {
+      for(unsigned int j = 0; j < graph.size; ++j) {
+        Node& node2 = graph.nodes[j];
+        if(node1.id_ == node2.id_) continue;
 /*
   力 := 力 + 定数 / 距離（ノード1, ノード2) ^ 2  // クーロン力
   force += getCoulombsForce(node1, node2);
 */
-        force += COULOMB / pow(abs(node1.v - node2.v), 2.0);
+        force += node1.getCoulombsForce(node2);
       }
       for(Edge edge : graph.adjacency_list[node1.id_]) {
-        auto node2 = graph.nodes.find(Node(edge.to_));
+        auto node2 = graph.nodes[edge.to_];
 /*
   力 := 力 + バネ定数 * (距離 (ノード1, ノード2) - バネの自然長)  // フックの法則による力
   force += getHookeForce(node1, node2);
 */
-        force += SPRING * (abs(node1.v - node2->v) - NATURAL_LENGTH);
+        force += node1.getSpringForce(node2);
       }
+      //std::cout << "force = " << force << std::endl;
 /*
   ノード１の速度 := (ノード1の速度 + 微小時間 * 力 / ノード1の質量) * 減衰定数
 */
-      node1.v = (node1.v + EPS * abs(force) / 1.0) * CODF;
-
+      //std::cout << "node_" << node1.id_ << " = " << node1.v << " -> ";
+      node1.v = Velocity((node1.v.real() + TIME * force.real() / 1.0) * CODF, (node1.v.imag() + TIME * force.imag() / 1.0) * CODF);
+      //std::cout << node1.v << std::endl;
 /*
   ノード１の位置 := ノード1の位置 + 微小時間 * ノード1の速度
 */
-      node1.x = node1.x + EPS * node1.v.real();
-      node1.y = node1.y + EPS * node1.v.imag();
-
+      //std::cout << "node_" << node1.id_ << " = (" << node1.x << ", " << node1.y << ") -> ";
+      node1.x = node1.x + TIME * node1.v.real();
+      node1.y = node1.y + TIME * node1.v.imag();
+      //std::cout << "(" << node1.x << ", " << node1.y << ")" << std::endl;
 /*
   運動エネルギーの合計 := 運動エネルギーの合計 + ノード1の質量 * ノード1の速度 ^ 2
 */
       sum_kinetic_energy += pow(abs(node1.v), 2.0);
     }
-  } while(sum_kinetic_energy < THRESHOLD);
+    //std::cout << "sum = " << sum_kinetic_energy << std::endl;
+  } while(sum_kinetic_energy > THRESHOLD);
 }
 
 
@@ -186,12 +212,9 @@ void eades(Graph& graph) {
 
 int main() {
   const unsigned int graph_size = 10;
-  eades::Graph graph;
-  graph.init(graph_size);
+  eades::Graph graph(graph_size);
   for(unsigned int i = 0; i < graph_size; ++i) {
-    for(unsigned int j = i + 1; j < graph_size; ++j) {
-      graph.addEdge(eades::Edge(i, j));
-    }
+    graph.addEdge(eades::Edge(i, (i + 1) % graph_size));
   }
   eades::eades(graph);
   graph.write("test.dot");
