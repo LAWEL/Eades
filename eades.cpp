@@ -28,9 +28,9 @@ namespace eades {
   const double MAX_COORDINATE = 1.0 * 1e3;
   const double COULOMB = 5.0 * 1e2;
   const double SPRING = 1e-1;
-  const double NATURAL_LENGTH = 3.0 * 1e2;
+  const double NATURAL_LENGTH = 1.0 * 1e2;
   const double CODF = 1.0 * 1e-1;
-  const double THRESHOLD = 1e-2;
+  const double THRESHOLD = 1e-4;
   const double TIME = 1e-1;
   const double EPS = 1e-6;
 
@@ -138,14 +138,14 @@ namespace eades {
       *ofs <<
         R"(digraph G {
   graph[bb="-2000,-2000,2000,2000",size="5,5"];
-  node [width="1", height="1",fixedsize="true", fontsize="50"];)" << std::endl;
+  node [width="0.4", height="0.4",fixedsize="true", fontsize="20"];)" << std::endl;
       for(auto node : nodes) {
         *ofs << "  " << node.label << " [pos=\"" << node.x << "," << node.y << "\"];" << std::endl;
       }
       for(auto node1 : nodes) {
         for(Edge edge : adjacency_list[node1.id_]) {
           auto node2 = nodes[edge.to_];
-          *ofs << "  " << node1.label << " -> " << node2.label << "[arrowsize = " << 2 << "];" << std::endl;
+          *ofs << "  " << node1.label << " -> " << node2.label << "[arrowsize = " << 1 << "];" << std::endl;
         }
       }
       *ofs << "}" << std::endl;
