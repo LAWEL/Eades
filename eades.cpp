@@ -210,13 +210,17 @@ void eades(Graph& graph) {
 
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if(argc != 2) {
+    std::cerr << "usage: ./eades output_file" << std::endl;
+    exit(1);
+  }
   const unsigned int graph_size = 10;
   eades::Graph graph(graph_size);
   for(unsigned int i = 0; i < graph_size; ++i) {
     graph.addEdge(eades::Edge(i, (i + 1) % graph_size));
   }
   eades::eades(graph);
-  graph.write("test.dot");
+  graph.write(argv[1]);
   return 0;
 }
