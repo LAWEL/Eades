@@ -1,0 +1,24 @@
+digraph G {
+  graph[bb="-2000,-2000,2000,2000",size="5,5"];
+  node [width="0.4", height="0.4",fixedsize="true", fontsize="20"];
+  p0 [pos="-19.252,311.654"];
+  p1 [pos="-133.086,290.342"];
+  p2 [pos="-190.907,185.785"];
+  p3 [pos="-181.456,71.4982"];
+  p4 [pos="-136.472,-25.9259"];
+  p5 [pos="-77.857,-111.26"];
+  p6 [pos="27.2323,-117.371"];
+  p7 [pos="73.0282,-3.16631"];
+  p8 [pos="70.9869,115.503"];
+  p9 [pos="50.9484,226.601"];
+  p0 -> p1[arrowsize = 1];
+  p1 -> p2[arrowsize = 1];
+  p2 -> p3[arrowsize = 1];
+  p3 -> p4[arrowsize = 1];
+  p4 -> p5[arrowsize = 1];
+  p5 -> p6[arrowsize = 1];
+  p6 -> p7[arrowsize = 1];
+  p7 -> p8[arrowsize = 1];
+  p8 -> p9[arrowsize = 1];
+  p9 -> p0[arrowsize = 1];
+}

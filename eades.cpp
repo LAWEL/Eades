@@ -133,8 +133,15 @@ namespace eades {
       adjacency_list[edge.from_].push_back(edge);
     }
 
-    void write(const std::string& file_name){
-      std::unique_ptr<std::ofstream, decltype(&Graph::myclose)> ofs(new std::ofstream(file_name), Graph::myclose);
+    void write(const std::string& file_name, bool last = true){
+      const int D = 10000;
+      static unsigned long long cnt = 0;
+      ++cnt;
+      if(cnt % D != 1 && !last) {
+        return;
+      }
+      const std::string temporary_name = (last ? file_name : file_name + std::to_string(cnt / D));
+      std::unique_ptr<std::ofstream, decltype(&Graph::myclose)> ofs(new std::ofstream(temporary_name), Graph::myclose);
       *ofs <<
         R"(digraph G {
   graph[bb="-2000,-2000,2000,2000",size="5,5"];
@@ -158,54 +165,55 @@ namespace eades {
 
   };
 
-void eades(Graph& graph) {
-  double sum_kinetic_energy;
-  unsigned long long cnt = 0;
-  do {
-    ++cnt;
-    sum_kinetic_energy = 0.0;
-    for(unsigned int i = 0; i < graph.size; ++i) {
-      Node& node1 = graph.nodes[i];
-      Force force;
-      for(unsigned int j = 0; j < graph.size; ++j) {
-        Node& node2 = graph.nodes[j];
-        if(node1.id_ == node2.id_) continue;
+  void eades(Graph& graph, const std::string& file_name) {
+    double sum_kinetic_energy;
+    unsigned long long cnt = 0;
+    do {
+      graph.write(file_name, false);
+      ++cnt;
+      sum_kinetic_energy = 0.0;
+      for(unsigned int i = 0; i < graph.size; ++i) {
+        Node& node1 = graph.nodes[i];
+        Force force;
+        for(unsigned int j = 0; j < graph.size; ++j) {
+          Node& node2 = graph.nodes[j];
+          if(node1.id_ == node2.id_) continue;
 /*
   力 := 力 + 定数 / 距離（ノード1, ノード2) ^ 2  // クーロン力
   force += getCoulombsForce(node1, node2);
 */
-        force += node1.getCoulombsForce(node2);
-      }
-      for(Edge edge : graph.adjacency_list[node1.id_]) {
-        auto node2 = graph.nodes[edge.to_];
+          force += node1.getCoulombsForce(node2);
+        }
+        for(Edge edge : graph.adjacency_list[node1.id_]) {
+          auto node2 = graph.nodes[edge.to_];
 /*
   力 := 力 + バネ定数 * (距離 (ノード1, ノード2) - バネの自然長)  // フックの法則による力
   force += getHookeForce(node1, node2);
 */
-        force += node1.getSpringForce(node2);
-      }
-      //std::cout << "force = " << force << std::endl;
+          force += node1.getSpringForce(node2);
+        }
+        //std::cout << "force = " << force << std::endl;
 /*
   ノード１の速度 := (ノード1の速度 + 微小時間 * 力 / ノード1の質量) * 減衰定数
 */
-      //std::cout << "node_" << node1.id_ << " = " << node1.v << " -> ";
-      node1.v = Velocity((node1.v.real() + TIME * force.real() / 1.0) * CODF, (node1.v.imag() + TIME * force.imag() / 1.0) * CODF);
-      //std::cout << node1.v << std::endl;
+        //std::cout << "node_" << node1.id_ << " = " << node1.v << " -> ";
+        node1.v = Velocity((node1.v.real() + TIME * force.real() / 1.0) * CODF, (node1.v.imag() + TIME * force.imag() / 1.0) * CODF);
+        //std::cout << node1.v << std::endl;
 /*
   ノード１の位置 := ノード1の位置 + 微小時間 * ノード1の速度
 */
-      //std::cout << "node_" << node1.id_ << " = (" << node1.x << ", " << node1.y << ") -> ";
-      node1.x = node1.x + TIME * node1.v.real();
-      node1.y = node1.y + TIME * node1.v.imag();
-      //std::cout << "(" << node1.x << ", " << node1.y << ")" << std::endl;
+        //std::cout << "node_" << node1.id_ << " = (" << node1.x << ", " << node1.y << ") -> ";
+        node1.x = node1.x + TIME * node1.v.real();
+        node1.y = node1.y + TIME * node1.v.imag();
+        //std::cout << "(" << node1.x << ", " << node1.y << ")" << std::endl;
 /*
   運動エネルギーの合計 := 運動エネルギーの合計 + ノード1の質量 * ノード1の速度 ^ 2
 */
-      sum_kinetic_energy += pow(abs(node1.v), 2.0);
-    }
-    //std::cout << "sum = " << sum_kinetic_energy << std::endl;
-  } while(sum_kinetic_energy > THRESHOLD);
-}
+        sum_kinetic_energy += pow(abs(node1.v), 2.0);
+      }
+      //std::cout << "sum = " << sum_kinetic_energy << std::endl;
+    } while(sum_kinetic_energy > THRESHOLD);
+  }
 
 
 }
@@ -220,7 +228,8 @@ int main(int argc, char* argv[]) {
   for(unsigned int i = 0; i < graph_size; ++i) {
     graph.addEdge(eades::Edge(i, (i + 1) % graph_size));
   }
-  eades::eades(graph);
+  eades::eades(graph, argv[1]);
+  std::cerr << "write -> " << argv[1] << std::endl;
   graph.write(argv[1]);
   return 0;
 }
